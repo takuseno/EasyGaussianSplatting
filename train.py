@@ -15,9 +15,12 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("--path", help="the path of dataset")
+    parser.add_argument("--nuscene", action="store_true")
     args = parser.parse_args()
 
-    if args.path:
+    if args.nuscene:
+        gs_set = NuSceneGSplatDataset()
+    elif args.path:
         print("Try to training %s ..." % args.path)
         gs_set = GSplatDataset(args.path)
     else:
@@ -37,7 +40,7 @@ if __name__ == "__main__":
         np.zeros(shape=(cam0.height, cam0.width, 3), dtype=np.uint8))
     txt = ax.text(50, 50, "", size=20, color='white')
 
-    epochs = 100
+    epochs = 300
     n = len(gs_set)
     model = GSModel(gs_set.sence_size, len(gs_set) * epochs)
 
