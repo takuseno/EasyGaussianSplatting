@@ -96,12 +96,14 @@ class LidarData:
 
 
 class NuSceneData:
-    def __init__(self):
+    def __init__(self, idx: int):
         # load NuScene data point
         nusc = NuScenes(version='v1.0-mini', dataroot=str(ROOT_DIR), verbose=True)
         scene = nusc.scene[0]
         first_sample_token = scene["first_sample_token"]
         sample = nusc.get("sample", first_sample_token)
+        for _ in range(idx):
+            sample = nusc.get("sample", sample["next"])
 
         # load camera data
         self.cam_sensors: Dict[str, CamData] = {}

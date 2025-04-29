@@ -10,6 +10,7 @@ from plyfile import PlyData
 import torchvision.transforms as transforms
 import faiss
 import numpy as np
+from nuscene.dataset import NuSceneData
 from nuscene.generate_colmap_format import get_colmap_data
 
 
@@ -77,10 +78,20 @@ class GSplatDataset(Dataset):
 
 
 class NuSceneGSplatDataset(Dataset):
-    def __init__(self, resize_rate: int = 1, device: str = "cuda"):
+    def __init__(self, idx: int, resize_rate: int = 1, device: str = "cuda"):
         self.resize_rate = resize_rate
         self.device = device
-        nuscene_cameras, nuscene_images, nuscene_points = get_colmap_data()
+
+        origin_pose = NuSceneData(0).lidar_data.ego_pose
+        nuscene_cameras = []
+        nuscene_images = []
+        nuscene_points = []
+        for idx in range(3):
+            data = NuSceneData(idx)
+            colmap_data = get_colmap_data(data, origin_pose)
+            nuscene_cameras.extend(colmap_data[0])
+            nuscene_images.extend(colmap_data[1])
+            nuscene_points.extend(colmap_data[2])
 
         self.cameras = []
         self.images = []

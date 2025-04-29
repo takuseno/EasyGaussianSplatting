@@ -6,12 +6,11 @@ from pathlib import Path
 from PIL import Image
 from pyquaternion import Quaternion
 
-from .dataset import CAM_LABELS, NuSceneData
+from .dataset import CAM_LABELS, NuSceneData, Pose, CamData
 
-root_dir = Path(os.path.dirname(__file__))
-(root_dir / "images").mkdir(exist_ok=True)
-(root_dir / "sparse" / "0").mkdir(parents=True, exist_ok=True)
 
+CAM2WORLD = np.array([[1, 0, 0], [0, 0, 1], [0, -1, 0]])
+WORLD2CAM = np.linalg.inv(CAM2WORLD)
 
 @dataclasses.dataclass(frozen=True)
 class Camera:
@@ -23,6 +22,19 @@ class Camera:
     fy: float
     cx: float
     cy: float
+
+    @classmethod
+    def from_cam_data(cls, idx: int, cam_data: CamData) -> "Camera":
+        return Camera(
+            id=idx,
+            model="PINHOLE",
+            width=cam_data.data.size[0],
+            height=cam_data.data.size[1],
+            fx=cam_data.camera_intrinsic[0][0],  # fx
+            fy=cam_data.camera_intrinsic[1][1],  # fy
+            cx=cam_data.camera_intrinsic[0][2],  # cx
+            cy=cam_data.camera_intrinsic[1][2],  # cy
+        )
 
 
 @dataclasses.dataclass(frozen=True)
@@ -41,6 +53,29 @@ class ColmapImage:
     data: Image.Image
     path: Path
 
+    @classmethod
+    def from_cam_data(cls, idx: int, cam_data: CamData, ego_pose: Pose, origin_pose: Pose) -> "ColmapImage":
+        # project to origin coordinate
+        cam_data_pose = to_origin(cam_data.calibration, ego_pose, origin_pose)
+        # rotate to convert coordinate system
+        q = Quaternion(matrix=WORLD2CAM @ Quaternion(cam_data_pose.rotation).rotation_matrix).inverse
+        t = -q.rotation_matrix @ WORLD2CAM @ cam_data_pose.translation
+        return ColmapImage(
+            id=idx,
+            qw=q.w,
+            qx=q.x,
+            qy=q.y,
+            qz=q.z,
+            tx=t[0],
+            ty=t[1],
+            tz=t[2],
+            camera_id=idx,
+            name=os.path.basename(cam_data.filename),
+            points2d=[],
+            data=cam_data.data,
+            path=cam_data.path,
+        )
+
 
 @dataclasses.dataclass
 class ColmapPoint3D:
@@ -54,58 +89,17 @@ class ColmapPoint3D:
     error: float
     tracks: List[Tuple[int, int]]
 
-
-def get_colmap_data() -> Tuple[List[Camera], List[ColmapImage], List[ColmapPoint3D]]:
-    data = NuSceneData()
-    cam2world = np.array([[1, 0, 0], [0, 0, 1], [0, -1, 0]])
-    world2cam = np.linalg.inv(cam2world)
-
-    # make cameras.txt
-    cameras = []
-    for i, label in enumerate(CAM_LABELS):
-        cam_data = data.cam_sensors[label]
-        camera = Camera(
-            id=i + 1,
-            model="PINHOLE",
-            width=cam_data.data.size[0],
-            height=cam_data.data.size[1],
-            fx=cam_data.camera_intrinsic[0][0],  # fx
-            fy=cam_data.camera_intrinsic[1][1],  # fy
-            cx=cam_data.camera_intrinsic[0][2],  # cx
-            cy=cam_data.camera_intrinsic[1][2],  # cy
-        )
-        cameras.append(camera)
-
-    images: List[ColmapImage] = []
-    for i, label in enumerate(CAM_LABELS):
-        cam_data = data.cam_sensors[label]
+    @classmethod
+    def from_points(cls, idx: int, point: np.ndarray, calibration: Pose, ego_pose: Pose, origin_pose: Pose) -> "ColmapPoint3D":
+        # project to origin coordinate
+        origin_rotmat_inv = Quaternion(origin_pose.rotation).inverse.rotation_matrix
+        ego_rotmat = Quaternion(ego_pose.rotation).rotation_matrix
+        offset_rotmat = origin_rotmat_inv @ ego_rotmat
+        offset_translation = origin_rotmat_inv @ (ego_pose.translation - origin_pose.translation)
         # rotate to convert coordinate system
-        q = Quaternion(matrix=world2cam @ Quaternion(cam_data.calibration.rotation).rotation_matrix).inverse
-        t = -q.rotation_matrix @ world2cam @ cam_data.calibration.translation
-        image = ColmapImage(
-            id=i + 1,
-            qw=q.w,
-            qx=q.x,
-            qy=q.y,
-            qz=q.z,
-            tx=t[0],
-            ty=t[1],
-            tz=t[2],
-            camera_id=i + 1,
-            name=os.path.basename(cam_data.filename),
-            points2d=[],
-            data=cam_data.data,
-            path=cam_data.path,
-        )
-        images.append(image)
-
-    points: List[ColmapPoint3D] = []
-    ego_points = data.lidar_data.to_ego_origin()
-    for i in range(data.lidar_data.data.points.shape[1]):
-        # rotate to convert coordinate system
-        x, y, z = world2cam @ ego_points[:3, i]
-        point = ColmapPoint3D(
-            id=i + 1,
+        x, y, z = WORLD2CAM @ ((offset_rotmat @ point) + offset_translation)
+        return ColmapPoint3D(
+            id=idx,
             x=x,
             y=y,
             z=z,
@@ -115,8 +109,52 @@ def get_colmap_data() -> Tuple[List[Camera], List[ColmapImage], List[ColmapPoint
             error=0,
             tracks=[],
         )
-        points.append(point)
 
+
+def to_origin(pose: Pose, ego_pose: Pose, origin_pose: Pose) -> Pose:
+    origin_rotmat_inv = Quaternion(origin_pose.rotation).inverse.rotation_matrix
+    ego_rotmat = Quaternion(ego_pose.rotation).rotation_matrix
+    pose_rotmat = Quaternion(pose.rotation).rotation_matrix
+    offset_rotmat = Quaternion(matrix=origin_rotmat_inv @ ego_rotmat).rotation_matrix
+    offset_translation = origin_rotmat_inv @ (ego_pose.translation - origin_pose.translation)
+    new_translation = pose.translation + offset_translation
+    new_rot = Quaternion(matrix=offset_rotmat @ pose_rotmat)
+    return Pose(
+        translation=new_translation,
+        rotation=np.array([new_rot.w, new_rot.x, new_rot.y, new_rot.z]),
+    )
+
+CAMERA_COUNTER = 0
+IMAGE_COUNTER = 0
+POINT_COUNTER = 0
+
+
+def get_colmap_data(data: NuSceneData, origin_pose: Pose) -> Tuple[List[Camera], List[ColmapImage], List[ColmapPoint3D]]:
+    global CAMERA_COUNTER
+    global IMAGE_COUNTER
+    global POINT_COUNTER
+    ego_pose = data.lidar_data.ego_pose
+
+    # make cameras.txt
+    cameras = []
+    for i, label in enumerate(CAM_LABELS):
+        cam_data = data.cam_sensors[label]
+        cameras.append(Camera.from_cam_data(CAMERA_COUNTER + 1, cam_data))
+        CAMERA_COUNTER += 1
+
+    images: List[ColmapImage] = []
+    for i, label in enumerate(CAM_LABELS):
+        cam_data = data.cam_sensors[label]
+        images.append(ColmapImage.from_cam_data(IMAGE_COUNTER + 1, cam_data, ego_pose, origin_pose))
+        IMAGE_COUNTER += 1
+
+    points: List[ColmapPoint3D] = []
+    ego_points = data.lidar_data.to_ego_origin()
+    for i in range(data.lidar_data.data.points.shape[1]):
+        points.append(ColmapPoint3D.from_points(POINT_COUNTER + 1, ego_points[:3, i], data.lidar_data.calibration, ego_pose, origin_pose))
+        POINT_COUNTER += 1
+
+    # project LiDAR to pixel 2D plane
     for image_idx, label in enumerate(CAM_LABELS):
         cam_data = data.cam_sensors[label]
         image = images[image_idx]

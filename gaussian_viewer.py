@@ -18,12 +18,13 @@ if __name__ == '__main__':
     parser.add_argument("--path", help="the path of dataset")
     parser.add_argument("--nuscene", action="store_true")
     parser.add_argument("--skip", help="skip", default=5)
+    parser.add_argument("--idx", type=int, default=1)
     args = parser.parse_args()
     cam_2_world = np.array([[1, 0, 0], [0, 0, 1], [0, -1, 0]])
     gs_set = []
     cam_size = 1
     if args.nuscene:
-        gs_set = NuSceneGSplatDataset()
+        gs_set = NuSceneGSplatDataset(idx=args.idx)
         gs = gs_set.gs
         cam_size = gs_set.sence_size * 0.05
         rotate_gaussian(cam_2_world, gs)
