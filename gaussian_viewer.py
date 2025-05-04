@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 
 import numpy as np
-from gsplat.gau_io import *
-from gsplat.gausplat_dataset import *
-import sys
-import os
-sys.path.append(os.path.join(os.path.dirname(__file__), 'viewer'))
+from pyquaternion import Quaternion
+from gsplat.gau_io import rotate_gaussian, load_gs, get_example_gs
+from gsplat.gausplat_dataset import NuSceneGSplatDataset, GSplatDataset
+from nuscene.dataset import Pose
 
-from viewer import *
-from custom_items import *
+from PyQt5.QtWidgets import QApplication
+from viewer.viewer import Viewer
+from viewer.custom_items import GLCameraFrameItem, GaussianItem, GridItem
 
 
 if __name__ == '__main__':
@@ -34,8 +34,9 @@ if __name__ == '__main__':
         gs = gs_set.gs
         cam_size = gs_set.sence_size * 0.05
         rotate_gaussian(cam_2_world, gs)
-    if args.gs:
+    elif args.gs:
         print("Try to load %s ..." % args.gs)
+        gs_set = NuSceneGSplatDataset(idx=args.idx)
         gs = load_gs(args.gs)
         rotate_gaussian(cam_2_world, gs)
 
@@ -51,20 +52,20 @@ if __name__ == '__main__':
 
     items = [("grid", grid_item), ("gs", gs_item)]
 
-    for i in range(len(gs_set)):
-        #if (i % args.skip != 0):
-        #    continue
-        cam, _ = gs_set[i]
-        T = np.eye(4)
-        Rcw = cam.Rcw.cpu().numpy()
-        tcw = cam.tcw.cpu().numpy()
-        Rwc = np.linalg.inv(Rcw)
-        twc = Rwc @ (-tcw)
-        T[:3, :3] = cam_2_world @ Rwc
-        T[:3, 3] = cam_2_world @ twc
-        cam_item = GLCameraFrameItem(T=T, path=cam.path, size=cam_size)
-        items.append(("cam%04d"%cam.id, cam_item))
-
+    if True or not args.gs:
+        for i in range(len(gs_set)):
+            #if (i % args.skip != 0):
+            #    continue
+            cam, _ = gs_set[i]
+            T = np.eye(4)
+            Rcw = cam.Rcw.cpu().numpy()
+            tcw = cam.tcw.cpu().numpy()
+            Rwc = np.linalg.inv(Rcw)
+            twc = Rwc @ (-tcw)
+            T[:3, :3] = cam_2_world @ Rwc
+            T[:3, 3] = cam_2_world @ twc
+            cam_item = GLCameraFrameItem(T=T, path=cam.path, size=cam_size)
+            items.append(("cam%04d"%cam.id, cam_item))
 
     viewer = Viewer(dict(items))
     viewer.items["gs"].setData(gs_data=gs_data)

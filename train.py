@@ -40,7 +40,7 @@ if __name__ == "__main__":
         np.zeros(shape=(cam0.height, cam0.width, 3), dtype=np.uint8))
     txt = ax.text(50, 50, "", size=20, color='white')
 
-    epochs = 1000
+    epochs = 30000
     n = len(gs_set)
     model = GSModel(gs_set.sence_size, len(gs_set) * epochs)
 

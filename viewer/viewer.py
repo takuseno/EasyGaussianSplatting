@@ -4,9 +4,10 @@ import numpy as np
 import pyqtgraph.opengl as gl
 from pyqtgraph.Qt import QtCore
 from PyQt5.QtWidgets import QWidget, QComboBox, QVBoxLayout, QSizePolicy,\
-      QSpacerItem, QLabel, QLineEdit, QMainWindow, QApplication, QDoubleSpinBox
+      QSpacerItem, QMainWindow, QApplication
 from OpenGL.GL import *
-from PyQt5.QtGui import QKeyEvent, QIntValidator, QDoubleValidator, QVector3D
+from PyQt5.QtGui import QKeyEvent, QIntValidator, QDoubleValidator, QVector3D, QQuaternion
+from nuscene.dataset import Pose
 
 
 class SettingWindow(QWidget):
@@ -53,7 +54,7 @@ class SettingWindow(QWidget):
 
 class MyViewWidget(gl.GLViewWidget):
     def __init__(self):
-        super(MyViewWidget, self).__init__()
+        super(MyViewWidget, self).__init__(rotationMethod="quaternion")
         self.setting_window = SettingWindow()
         self.plugin_items = None
 
