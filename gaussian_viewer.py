@@ -3,7 +3,7 @@
 import numpy as np
 from pyquaternion import Quaternion
 from gsplat.gau_io import rotate_gaussian, load_gs, get_example_gs
-from gsplat.gausplat_dataset import NuSceneGSplatDataset, GSplatDataset
+from gsplat.gausplat_dataset import NuSceneGSplatDataset, GSplatDataset, WaymoGSplatDataset
 from nuscene.dataset import Pose
 
 from PyQt5.QtWidgets import QApplication
@@ -17,6 +17,7 @@ if __name__ == '__main__':
     parser.add_argument("--gs", help="the trained gs data")
     parser.add_argument("--path", help="the path of dataset")
     parser.add_argument("--nuscene", action="store_true")
+    parser.add_argument("--waymo", action="store_true")
     parser.add_argument("--skip", help="skip", default=5)
     parser.add_argument("--idx", type=int, default=1)
     args = parser.parse_args()
@@ -27,6 +28,11 @@ if __name__ == '__main__':
         gs_set = NuSceneGSplatDataset(idx=args.idx)
         gs = gs_set.gs
         cam_size = gs_set.sence_size * 0.05
+        rotate_gaussian(cam_2_world, gs)
+    elif args.waymo:
+        gs_set = WaymoGSplatDataset(idx=args.idx)
+        gs = gs_set.gs
+        cam_size = gs_set.sence_size# * 0.05
         rotate_gaussian(cam_2_world, gs)
     elif args.path:
         print("Try to training %s ..." % args.path)
@@ -40,7 +46,7 @@ if __name__ == '__main__':
         gs = load_gs(args.gs)
         rotate_gaussian(cam_2_world, gs)
 
-    if (not args.gs) and (not args.path) and (not args.nuscene):
+    if (not args.gs) and (not args.path) and (not args.nuscene) and (not args.waymo):
         print("not gs file.")
         gs = get_example_gs()
 
@@ -52,20 +58,19 @@ if __name__ == '__main__':
 
     items = [("grid", grid_item), ("gs", gs_item)]
 
-    if True or not args.gs:
-        for i in range(len(gs_set)):
-            #if (i % args.skip != 0):
-            #    continue
-            cam, _ = gs_set[i]
-            T = np.eye(4)
-            Rcw = cam.Rcw.cpu().numpy()
-            tcw = cam.tcw.cpu().numpy()
-            Rwc = np.linalg.inv(Rcw)
-            twc = Rwc @ (-tcw)
-            T[:3, :3] = cam_2_world @ Rwc
-            T[:3, 3] = cam_2_world @ twc
-            cam_item = GLCameraFrameItem(T=T, path=cam.path, size=cam_size)
-            items.append(("cam%04d"%cam.id, cam_item))
+    for i in range(len(gs_set)):
+        #if (i % args.skip != 0):
+        #    continue
+        cam, _ = gs_set[i]
+        T = np.eye(4)
+        Rcw = cam.Rcw.cpu().numpy()
+        tcw = cam.tcw.cpu().numpy()
+        Rwc = np.linalg.inv(Rcw)
+        twc = Rwc @ (-tcw)
+        T[:3, :3] = cam_2_world @ Rwc
+        T[:3, 3] = cam_2_world @ twc
+        cam_item = GLCameraFrameItem(T=T, path=cam.path, size=cam_size)
+        items.append(("cam%04d"%cam.id, cam_item))
 
     viewer = Viewer(dict(items))
     viewer.items["gs"].setData(gs_data=gs_data)
