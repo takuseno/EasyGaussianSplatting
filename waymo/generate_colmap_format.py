@@ -61,7 +61,8 @@ class ColmapImage:
     @classmethod
     def from_cam_data(cls, idx: int, cam_data: CamData, ego_pose: Pose, origin_pose: Pose) -> "ColmapImage":
         # camera to vehicle
-        mat = np.linalg.inv(cam_data.extrinsic @ opencv2camera)
+        #mat = np.linalg.inv(cam_data.extrinsic @ opencv2camera)
+        mat = cam_data.extrinsic @ opencv2camera
         # project to origin coordinate
         cam_data_pose = to_origin(Pose.from_matrix(mat), ego_pose, origin_pose)
         # rotate to convert coordinate system

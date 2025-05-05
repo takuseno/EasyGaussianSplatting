@@ -42,7 +42,8 @@ if __name__ == '__main__':
         rotate_gaussian(cam_2_world, gs)
     elif args.gs:
         print("Try to load %s ..." % args.gs)
-        gs_set = NuSceneGSplatDataset(idx=args.idx)
+        #gs_set = NuSceneGSplatDataset(idx=args.idx)
+        gs_set = WaymoGSplatDataset(idx=args.idx)
         gs = load_gs(args.gs)
         rotate_gaussian(cam_2_world, gs)
 

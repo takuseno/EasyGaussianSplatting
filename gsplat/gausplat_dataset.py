@@ -161,16 +161,17 @@ class WaymoGSplatDataset(Dataset):
         self.resize_rate = resize_rate
         self.device = device
 
-        origin_pose = WaymoPose.from_matrix(WaymoData().lidar_data.ego_pose)
+        origin_pose = WaymoPose.from_matrix(WaymoData(0).lidar_data.ego_pose)
         nuscene_cameras = []
         nuscene_images = []
         nuscene_points = []
 
-        data = WaymoData()
-        colmap_data = get_waymo_colmap_data(data, origin_pose)
-        nuscene_cameras.extend(colmap_data[0])
-        nuscene_images.extend(colmap_data[1])
-        nuscene_points.extend(colmap_data[2])
+        for idx in range(5):
+            data = WaymoData(idx)
+            colmap_data = get_waymo_colmap_data(data, origin_pose)
+            nuscene_cameras.extend(colmap_data[0])
+            nuscene_images.extend(colmap_data[1])
+            nuscene_points.extend(colmap_data[2])
 
         self.cameras = []
         self.images = []

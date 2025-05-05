@@ -55,16 +55,8 @@ class Pose:
 
     @classmethod
     def from_matrix(cls, mat: np.ndarray) -> "Pose":
-        #mat = np.array([[0, 0, 1, 0], [-1, 0, 0, 0], [0, -1, 0, 0], [0, 0, 0, 1]]) @ mat
         quaternion = Quaternion(matrix=mat[:3, :3])
         translation = mat[:3, 3].reshape(-1)
-        #translation = np.array([-translation[1], -translation[2], translation[0]])
-        #offset_rot = euler_to_rotation_matrix(np.pi / 2, np.pi / 2, 0)
-        #offset_rot = euler_to_rotation_matrix(0, np.pi, np.pi) @ offset_rot
-        #quaternion = Quaternion(np.array([quaternion.w, -quaternion.y, -quaternion.z, quaternion.x]))
-        #quaternion = Quaternion(matrix=offset_rot @ quaternion.rotation_matrix)
-        #return Pose(np.array([quaternion.w, quaternion.x, quaternion.y, quaternion.z]), offset_rot @ translation)
-        #translation = np.array([-translation[1], -translation[2], translation[0]])
         return Pose(np.array([quaternion.w, quaternion.x, quaternion.y, quaternion.z]), translation)
 
 
@@ -109,13 +101,14 @@ class LidarData:
 
 
 class WaymoData:
-    def __init__(self):
+    def __init__(self, idx: int):
         self.datafile = WaymoDataFileReader("/home/takuma/datasets/waymo/individual_files_training_segment-10061305430875486848_1080_000_1100_000_with_camera_labels.tfrecord")
         # Generate a table of the offset of all frame records in the file.
         table = self.datafile.get_record_table()
 
-        frame = next(self.datafile)
-        assert frame
+        for _ in range(idx + 1):
+            frame = next(self.datafile)
+            assert frame
 
         ego_pose = np.array(frame.pose.transform).reshape(4, 4)
 

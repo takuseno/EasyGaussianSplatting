@@ -16,10 +16,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--path", help="the path of dataset")
     parser.add_argument("--nuscene", action="store_true")
+    parser.add_argument("--waymo", action="store_true")
     args = parser.parse_args()
 
     if args.nuscene:
         gs_set = NuSceneGSplatDataset(idx=0)
+    elif args.waymo:
+        gs_set = WaymoGSplatDataset(idx=0)
     elif args.path:
         print("Try to training %s ..." % args.path)
         gs_set = GSplatDataset(args.path)
